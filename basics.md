@@ -21,6 +21,7 @@
 Самая идея как отсылка к стандартной библиотеке `http.Server`
 
 **Экземпляр сервера:** 
+
 Создаём сервер как отдельный тип(структуру) в которую включаем все зависимости. 
 
 Таким образом мы сможем избежать глобальных переменных, что является плохой практикой
@@ -33,13 +34,16 @@ type server struct {
 ```
 
 **Ресурсы и зависимости**
+
 Наш сервер может использовать внешние ресурсы такие как роутеры, логгеры, инстансы БД и т.д
 
 
-**Обработчики, middleware** 
+**Обработчики, middleware**
+
 Обработчики(handlers) в данном случае являются методами структуры. 
 
 Позволяет обеспечить обработчикам доступ к зависимостям включённым в структуру сервера 
+
 ```golang
 func (s *server) handleSomething() http.HandlerFunc { ... }
 ```
@@ -47,6 +51,7 @@ func (s *server) handleSomething() http.HandlerFunc { ... }
 В качестве обработчиков лучше использовать не просто функции которые которые реализуют интерфейс `http.Handler`, 
 например `func handleAction(w http.ResponseWriter, r *http.Request)`,
 а функции которые возвращают такой обработчик, например:
+
 ```golang
 func (s *server) handleSomething(responseFormat string) http.HandlerFunc {
     //do something
@@ -56,7 +61,9 @@ func (s *server) handleSomething(responseFormat string) http.HandlerFunc {
     }
 }
 ```
+
 Это позволит:
+
 * реализовать механизм middlware, т.к. функции могут вкладываться друг в друга, это позволит к примеру проверять авторизацию, включать дополнительную бизнес логику непосредственно перед выполнением функции-обработчика и т.п, результат работы преварительного когда так же можно использовать в функции-обаботчике. В данном примере это `doSomething()`
 * если в обработчике требуются дополнительные параметры, которые будут уникальны только для этого обработчика и которые мы не хотим включать в качестве зависимостей в структуру сервера, мы можем передать их в качестве аргумента в функцию обёртки (`responseFormat`)
 
@@ -68,10 +75,23 @@ func (s *server) handleSomething(responseFormat string) http.HandlerFunc {
 
 ```golang
 //main.go
+app.Run(ctx)
+e := <-app.Notify():
+fmt.Printf("Server error: %s \n", e.Error())
 ```
 
 ```golang
 //app.go
+func (app *Application) Run(ctx context.Context) {
+	go func() {
+		app.errors <- app.server.ListenAndServe()
+		close(app.errors)
+	}()
+}
+
+func (app *Application) Notify() <-chan error {
+	return app.errors
+}
 ```
 
 * Не забываем обрабатывать системные сигналы
