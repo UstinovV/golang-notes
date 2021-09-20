@@ -11,65 +11,75 @@
 Общепринятой архитекруры не существует. Архитектура должна подбираться исходя из задач/ситуации
 
 * Плоская архитектура. Подходит для маленьких проектов
-* Слоистая/модульная. Малые/средние проекты.
+* Слоистая/модульная. Малые/средние проекты. [Пример](https://github.com/oralordos/separation/blob/master/main.go)
 * Standart project layout. Для средних и крупных проектов - неофицально принятая в сообществе [архитектура](https://github.com/golang-standards/project-layout).
 
 ---
 
-<h4>Сервер как структура</h4>
-Самая идея как отсылка к стандартной библиотеке `http.Server`
+<h4>Приложение как структура</h4>
 
-**Экземпляр сервера:** 
+**Экземпляр приложения:** 
 
-Создаём сервер как отдельный тип(структуру) в которую включаем все зависимости. 
+Создаём приложение как отдельный тип(структуру) в которую включаем все зависимости. Таким образом мы сможем избежать глобальных переменных, что является плохой практикой.
 
-Таким образом мы сможем избежать глобальных переменных, что является плохой практикой
+Если это веб-приложение в зависимости можно включить непосредственно сервер. Это позволит сконфигурировать сервер под наши нужны
+
 ```golang
-type server struct {
-  db     *Database
-  logger *Logger
-  router *Router
+type Application struct {
+	server *http.Server
+	logger *zap.Logger
+	db     *sql.DB
+	errors chan error
 }
 ```
-
-**Ресурсы и зависимости**
-
-Наш сервер может использовать внешние ресурсы такие как роутеры, логгеры, инстансы БД и т.д
 
 **Обработчики, middleware**
 
-Обработчики(handlers) в данном случае являются методами структуры. 
-
-Позволяет обеспечить обработчикам доступ к зависимостям включённым в структуру сервера 
-
-```golang
-func (s *server) handleSomething() http.HandlerFunc { ... }
-```
-
 В качестве обработчиков лучше использовать не просто функции которые которые реализуют интерфейс `http.Handler`, 
-например `func handleAction(w http.ResponseWriter, r *http.Request)`,
-а функции которые возвращают такой обработчик, например:
+например `func handleAction(w http.ResponseWriter, r *http.Request)`, а функции которые возвращают такой обработчик.
+
+* Обработчики как функции / stateless
 
 ```golang
-func (s *server) handleSomething(responseFormat string) http.HandlerFunc {
-    //do something
-    result := doSomething()
-    return func(w http.ResponseWriter, r *http.Request) {
-      fmt.Fprintf(w, format, result)
-    }
+func mainHandler() http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		p := r.URL.Query().Get("panic")
+		if p != "" {
+			panic("panic received")
+		}
+		w.WriteHeader(200)
+		w.Write([]byte("Hello, world"))
+	})
 }
 ```
 
-Это позволит:
+* Структуры как обработчик / stateful
 
-* реализовать механизм middlware, т.к. функции могут вкладываться друг в друга, это позволит к примеру проверять авторизацию, включать дополнительную бизнес логику непосредственно перед выполнением функции-обработчика и т.п, результат работы преварительного когда так же можно использовать в функции-обаботчике. В данном примере это `doSomething()`
-* если в обработчике требуются дополнительные параметры, которые будут уникальны только для этого обработчика и которые мы не хотим включать в качестве зависимостей в структуру сервера, мы можем передать их в качестве аргумента в функцию обёртки (`responseFormat`)
+```golang
+//handlers.go
+type CounterHandler struct {
+	counter int
+}
+
+func (ct *CounterHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	ct.counter++
+	fmt.Fprint(w, "Counter:", ct.counter)
+}
+```
+
+```golang
+//myapp.go
+mux := http.NewServeMux()
+counter := &CounterHandler{0}
+
+mux.Handle("/counter", counter)
+```
 
 ---
 
 **Запуск, остановка сервиса**
 
-* Сервис запускается в отдельной горутине. Коммуникация сервиса с основной горутиной осуществляется посредством канала с ошибками
+* Сервис запускается в отдельной горутине. Коммуникация сервиса с основной горутиной может осуществляется посредством канала с ошибками
 
 ```golang
 //main.go
@@ -92,20 +102,67 @@ func (app *Application) Notify() <-chan error {
 }
 ```
 
-* Не забываем обрабатывать системные сигналы
+* Обработка системных сигналов
 
 ```golang
-  interrupt := make(chan os.Signal, 1)
-	signal.Notify(interrupt, syscall.SIGINT, syscall.SIGTERM)
-  s := <-interrupt
-	fmt.Printf("Received a signal: %s \n", s.String())
+interrupt := make(chan os.Signal, 1)
+signal.Notify(interrupt, syscall.SIGINT, syscall.SIGTERM)
+s := <-interrupt
+fmt.Printf("Received a signal: %s \n", s.String())
 ```
 
-* Не забываем освобождать ресурсы после остановки сервиса. Этого можно добиться посредством общего Context'a и/или в функции остановки
+* Освобождение ресурсов
 
+Перед завершением основной программы необходимо убедиться что все запущенные горутины завершились. Этого можно добиться посредством передачи `context.Context`.
+
+В случае веб-сервиса в стандартной библиотеке присутствует метод `http.Shutdown(ctx context.Context)`
+
+```golang
+func (app *Application) Shutdown() {
+	fmt.Println("Shutting down...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := app.logger.Sync()
+	if err != nil {
+		log.Fatal(fmt.Errorf("error flushing logger buffer: %s", err.Error()))
+	}
+
+	if err = app.server.Shutdown(ctx); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Server is down...")
+}
+```
 
 **Востановление после паники**
 Важно! Допускать паники не стоит. Однако если есть места где возможно её возникновение - необходимо правильно восстановить работу сервиса.
+
+В случае веб-сервиса обработку паники можно включить в middleware
+
+```golang
+//handlers.go
+func mainHandler() http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		p := r.URL.Query().Get("panic")
+		if p != "" {
+			panic("panic received")
+		}
+		w.WriteHeader(200)
+		w.Write([]byte("Hello, world"))
+	})
+}
+```
+
+```golang
+//myapp.go
+mux := http.NewServeMux()
+counter := &CounterHandler{0}
+
+mux.Handle("/", RecoverMiddleware(mainHandler()))
+mux.Handle("/counter", RecoverMiddleware(counter))
+```
 
 ---
 
