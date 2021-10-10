@@ -36,10 +36,10 @@ type Application struct {
 
 **Обработчики, middleware**
 
+* Обработчики как функции / stateless
+
 В качестве обработчиков лучше использовать не просто функции которые которые реализуют интерфейс `http.Handler`, 
 например `func handleAction(w http.ResponseWriter, r *http.Request)`, а функции которые возвращают такой обработчик.
-
-* Обработчики как функции / stateless
 
 ```golang
 func mainHandler() http.HandlerFunc {
@@ -174,8 +174,4 @@ mux.Handle("/counter", RecoverMiddleware(counter))
 - [Production-ready сервис на Go](https://github.com/PetStores/go-simple/tree/base), [Видео с пояснением](https://youtu.be/yxE5zxTOeUI?t=1822)
 - [Как я пишу сервисы спустя 8 лет](https://pace.dev/blog/2018/05/09/how-I-write-http-services-after-eight-years.html) - статья с полезными заметками по написанию go-сервисов
 - [Golang tutorial](https://tutorialedge.net/golang/) - туториал с большим количеством рецептов и примерами кода 
-
-TODO
-* линтеры
-* тестирование
-* профилирование
+- [Blog calhoun.io](https://www.calhoun.io/) - блог по Go
