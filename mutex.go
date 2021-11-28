@@ -23,8 +23,8 @@ func throw(string) // provided by runtime
 //
 // A Mutex must not be copied after first use.
 type Mutex struct {
-	state int32
-	sema  uint32
+	state int32  // хранит состояние
+	sema  uint32 // семафор для пробуждения горутин
 }
 
 // A Locker represents an object that can be locked and unlocked.
@@ -34,6 +34,7 @@ type Locker interface {
 }
 
 const (
+	//Игры разума: угадай что будет в константах ?
 	mutexLocked = 1 << iota // mutex is locked
 	mutexWoken
 	mutexStarving
@@ -64,6 +65,8 @@ const (
 	// a mutex several times in a row even if there are blocked waiters.
 	// Starvation mode is important to prevent pathological cases of tail latency.
 	starvationThresholdNs = 1e6
+
+	//Игры разума: 1 2 4 3
 )
 
 // Lock locks m.
@@ -90,6 +93,8 @@ func (m *Mutex) lockSlow() {
 	for {
 		// Don't spin in starvation mode, ownership is handed off to waiters
 		// so we won't be able to acquire the mutex anyway.
+		// old & (0001 | 0100) == 1 && isCanSpin()
+
 		if old&(mutexLocked|mutexStarving) == mutexLocked && runtime_canSpin(iter) {
 			// Active spinning makes sense.
 			// Try to set mutexWoken flag to inform Unlock
