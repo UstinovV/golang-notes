@@ -178,3 +178,4 @@ mux.Handle("/counter", RecoverMiddleware(counter))
 - [Как я пишу сервисы спустя 8 лет](https://pace.dev/blog/2018/05/09/how-I-write-http-services-after-eight-years.html) - статья с полезными заметками по написанию go-сервисов
 - [Golang tutorial](https://tutorialedge.net/golang/) - туториал с большим количеством рецептов и примерами кода 
 - [Blog calhoun.io](https://www.calhoun.io/) - блог по Go
+- [Golang articles](https://github.com/golang/go/wiki/Articles) - огромный архив статей по Go в офицальном репозитории
