@@ -8,7 +8,7 @@
 // better done via channels and communication.
 //
 // Values containing the types defined in this package should not be copied.
-package sync
+package mu
 
 import (
 	"internal/race"
@@ -34,11 +34,10 @@ type Locker interface {
 }
 
 const (
-	//Игры разума: угадай что будет в константах ?
-	mutexLocked = 1 << iota // mutex is locked
-	mutexWoken
-	mutexStarving
-	mutexWaiterShift = iota
+	//mutexLocked = 1 << iota // mutex is locked // 1
+	//mutexWoken // 2
+	//mutexStarving // 4
+	//mutexWaiterShift = iota // 3
 
 	// Mutex fairness.
 	//
@@ -66,7 +65,6 @@ const (
 	// Starvation mode is important to prevent pathological cases of tail latency.
 	starvationThresholdNs = 1e6
 
-	//Игры разума: 1 2 4 3
 )
 
 // Lock locks m.
@@ -93,12 +91,14 @@ func (m *Mutex) lockSlow() {
 	for {
 		// Don't spin in starvation mode, ownership is handed off to waiters
 		// so we won't be able to acquire the mutex anyway.
-		// old & (0001 | 0100) == 1 && isCanSpin()
-
+		// когда мьютекс заблокирован и runtime_canSpin
 		if old&(mutexLocked|mutexStarving) == mutexLocked && runtime_canSpin(iter) {
 			// Active spinning makes sense.
 			// Try to set mutexWoken flag to inform Unlock
 			// to not wake other blocked goroutines.
+			// если не разбужен и (если залочен или Starving) и (если мьютекс залочен или разбужен)
+			// т.е. когда мьютекс заблокирован и горутина не разбужена -  будим горутину и
+			// устанавливаем новое состояние мьютекса = mutexWaiterShift (3)
 			if !awoke && old&mutexWoken == 0 && old>>mutexWaiterShift != 0 &&
 				atomic.CompareAndSwapInt32(&m.state, old, old|mutexWoken) {
 				awoke = true
