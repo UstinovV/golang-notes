@@ -59,6 +59,7 @@ type Mutex struct {
 
 - типы мьютексов
 - рид врайт ридврайт
+- sync.Cond
 - (Танцы с мьютексами)[https://habr.com/ru/post/271789/] - Хорошая статья по работе с мьютексами
 - https://medium.com/a-journey-with-go/go-mutex-and-starvation-3f4f4e75ad50 - объяснение механизма starvation
 - https://programmer.group/source-analysis-of-sync.mutex-in-golang.html - подробный разбор исходного кода мьютексов в Go
