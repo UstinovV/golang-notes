@@ -1,6 +1,6 @@
 <h3>Mutex</h3>
 
-(Мьютекс)[https://ru.wikipedia.org/wiki/%D0%9C%D1%8C%D1%8E%D1%82%D0%B5%D0%BA%D1%81] (от англ. mutual exclusion - взаимное исключение) это структура, которая благодаря хранимому состоянию позволяет обеспечить доступ к (критической секции)[https://ru.wikipedia.org/wiki/%D0%9A%D1%80%D0%B8%D1%82%D0%B8%D1%87%D0%B5%D1%81%D0%BA%D0%B0%D1%8F_%D1%81%D0%B5%D0%BA%D1%86%D0%B8%D1%8F] только одной горутине. 
+[Мьютекс](https://ru.wikipedia.org/wiki/%D0%9C%D1%8C%D1%8E%D1%82%D0%B5%D0%BA%D1%81) (от англ. mutual exclusion - взаимное исключение) это структура, которая благодаря хранимому состоянию позволяет обеспечить безопасный доступ к [критической секции](https://ru.wikipedia.org/wiki/%D0%9A%D1%80%D0%B8%D1%82%D0%B8%D1%87%D0%B5%D1%81%D0%BA%D0%B0%D1%8F_%D1%81%D0%B5%D0%BA%D1%86%D0%B8%D1%8F) только одной горутине. 
 
 
 ```golang
@@ -15,13 +15,13 @@ type Mutex struct {
 
 // Справедливость мьютексов.
 
-// Mutex может быть в 2-х режимах работы: нормальном и (голодном/Starvation)[https://en.wikipedia.org/wiki/Starvation_%28computer_science%29].
+// Mutex может быть в 2-х режимах работы: нормальном и [голодном/Starvation](https://en.wikipedia.org/wiki/Starvation_%28computer_science%29).
 // В обычном режиме waiters(ожидающие горутины) выстраиваются в очередь в порядке FIFO, но разбуженый waiter не захватывает мьютекс сразу, а конкурирует с новыми прибывающими горутинами за М. У новых прибывающих горутин есть преимущество - они
 // уже работает на ЦП и их может быть много, поэтому разбуженый
 // waiters с большой вероятностью может не получить мьютекс. В таком случае он ставится в начало очереди ожидания.
 // Если waiters не удается получить мьютекс дольше 1 мс, мьютекс переключается в режим голодания/ожидания.
 
-// В режиме голодания/ожидания владение мьютексом напрямую передается от
+// В режиме Starvation владение мьютексом напрямую передается от
 // горутины, которая его разблокирует, waiter'у который стоит первым в очереди.
 // Новые прибывающие горутины не пытаются захватить мьютекс, даже если он освобождается и не переходят в режим Spinning. Вместо этого они выстраиваются в очередь в
 // конец очереди ожидания.
@@ -36,15 +36,30 @@ type Mutex struct {
 
 ```
 
-Варианты работы с мьютексами до го 1.9:
+**Варианты работы с мьютексами до го 1.9**:
 
-* **Barging** (to barge - move forcefully or roughly.) - создан для увеличения производительности. Когда снимается лок, будит первого waiter'a и отдаёт ему лок, 
+* `Barging` (to barge - move forcefully or roughly.) - создан для увеличения производительности. Когда снимается лок, будит первого waiter'a и отдаёт ему лок, 
 либо первому прешедшему запросу (от новых горутин)
-* **Handoff** (раздача) - лок удерживается до тех пор, пока первый офицант не будет готов его принять, даже если есть новые горутины, готовые его принять. 
+* `Handoff` (раздача) - лок удерживается до тех пор, пока первый офицант не будет готов его принять, даже если есть новые горутины, готовые его принять. 
 Снижает производительность.
-* **Spinning** - использует логику (spinlock'ов)[https://ru.wikipedia.org/wiki/%D0%A1%D0%BF%D0%B8%D0%BD-%D0%B1%D0%BB%D0%BE%D0%BA%D0%B8%D1%80%D0%BE%D0%B2%D0%BA%D0%B0] Помещение горутин и получение их из очереди имеет свой оверхед. Поэтому этот метод используется тогда, когда нет waiter'ов, либо приложение активно использует мьютексы. При попытке получения уже занятого мьютекса, горутина сделает несколько итераций(spin'ов) если очередь пуста либо есть несколько процессоров(spinning на одном процессоре блокирует программу)
+* `Spinning` - использует логику [spinlock'ов](https://ru.wikipedia.org/wiki/%D0%A1%D0%BF%D0%B8%D0%BD-%D0%B1%D0%BB%D0%BE%D0%BA%D0%B8%D1%80%D0%BE%D0%B2%D0%BA%D0%B0) Помещение горутин и получение их из очереди имеет свой оверхед. Поэтому этот метод используется тогда, когда нет waiter'ов, либо приложение активно использует мьютексы. При попытке получения уже занятого мьютекса, горутина сделает несколько итераций(spin'ов) если очередь пуста либо есть несколько процессоров(spinning на одном процессоре блокирует программу)
 
-Стандартным подходом является имплементация мьютекса в саму структуру
+**Типы мьютексов**
+
+- `sync.Mutex` - блокировка одновременно на чтение и на запись
+- `sync.RWMutex` - с помощью методов RLock()/RUnlock() позволяет блокировать данные только для изменения, операции чтения при этом не блокируются
+- `sync/atomic` - предоставляет низкоуровневые примитивы для синхронизации доступа к данным
+    * `func LoadType(addr *Type) (val Type)` - получить значение по адресу
+    * `func StoreType(addr *Type, val Type)` - сохранить значение
+    * `func AddType(addr *Type, delta Type) (new Type)` - увеличивает значение
+    * `func SwapType(addr *Type, new Type) (old Type)` - поменять местами значения
+    * `func CompareAndSwapType(addr *Type, old, new Type) (swapped bool)` - сравнивает новое значение со старым, если они отличаются - заменяет старое значение новым
+- `sync.Map` - используется в некоторых случаях для синхронизации доступа к map, когда количество запросов на чтение сильно превышает количество запросов на запись 
+
+**Использование**
+
+Стандартным подходом является имплементация мьютекса в саму структуру. 
+Т.е. структура с мьютексом инкапсулирует работу со своим состоянием 
 
 ```golang
 type example struct {
@@ -53,35 +68,33 @@ type example struct {
 }
 ```
 
-Структура с мьютексом инкапсулирует работу со своим состоянием
-
 Когда использовать Каналы: передача владения данными, распределение вычислений и передача асинхронных результатов.
 Когда использовать Мьютексы: кэши, состояния.
 
-Полезные статьи:
-- (Танцы с мьютексами)[https://habr.com/ru/post/271789/] - Хорошая статья по работе с мьютексами
-- (Mutex and Starvation)[https://medium.com/a-journey-with-go/go-mutex-and-starvation-3f4f4e75ad50] - объяснение механизма starvation
-- (Source analysis of sync.Mutex )[https://programmer.group/source-analysis-of-sync.mutex-in-golang.html] - подробный разбор исходного кода мьютексов в Go
+**Полезные статьи**:
+- [Танцы с мьютексами](https://habr.com/ru/post/271789/) - Хорошая статья по работе с мьютексами
+- [Mutex and Starvation](https://medium.com/a-journey-with-go/go-mutex-and-starvation-3f4f4e75ad50) - объяснение механизма starvation
+- [Source analysis of sync.Mutex](https://programmer.group/source-analysis-of-sync.mutex-in-golang.html) - подробный разбор исходного кода мьютексов в Go
+- [Atomic Operations Provided in The sync/atomic](https://go101.org/article/concurrent-atomic-operation.html) - разбор функций из пакета `sync/atomic`
+- [sync.Map в Go 1.9](https://habr.com/ru/post/338718/) - конкуретнобезопасная работа с мапами с использованием sync.Map
 
+**Примитивы конкурентности**:
+- [Mutex](https://ru.wikipedia.org/wiki/%D0%9C%D1%8C%D1%8E%D1%82%D0%B5%D0%BA%D1%81)
+- [Critical section](https://ru.wikipedia.org/wiki/%D0%9A%D1%80%D0%B8%D1%82%D0%B8%D1%87%D0%B5%D1%81%D0%BA%D0%B0%D1%8F_%D1%81%D0%B5%D0%BA%D1%86%D0%B8%D1%8F)
+- [Spinblock](https://ru.wikipedia.org/wiki/%D0%9C%D1%8C%D1%8E%D1%82%D0%B5%D0%BA%D1%81)
+- [Semaphore](https://ru.wikipedia.org/wiki/%D0%A1%D0%B5%D0%BC%D0%B0%D1%84%D0%BE%D1%80_(%D0%BF%D1%80%D0%BE%D0%B3%D1%80%D0%B0%D0%BC%D0%BC%D0%B8%D1%80%D0%BE%D0%B2%D0%B0%D0%BD%D0%B8%D0%B5))
+- [Starvation](https://en.wikipedia.org/wiki/Starvation_%28computer_science%29)
+- [Bounded waiting](https://en.wikipedia.org/wiki/Peterson%27s_algorithm#Bounded_waiting)
+- [Futex](https://ru.wikipedia.org/wiki/%D0%A4%D1%8C%D1%8E%D1%82%D0%B5%D0%BA%D1%81)
 
-Примитивы конкурентности:
-- (Mutex)[https://ru.wikipedia.org/wiki/%D0%9C%D1%8C%D1%8E%D1%82%D0%B5%D0%BA%D1%81]
-- (Critical section)[https://ru.wikipedia.org/wiki/%D0%9A%D1%80%D0%B8%D1%82%D0%B8%D1%87%D0%B5%D1%81%D0%BA%D0%B0%D1%8F_%D1%81%D0%B5%D0%BA%D1%86%D0%B8%D1%8F]
-- (Spinblock)[https://ru.wikipedia.org/wiki/%D0%9C%D1%8C%D1%8E%D1%82%D0%B5%D0%BA%D1%81]
-- (Semaphore)[https://ru.wikipedia.org/wiki/%D0%A1%D0%B5%D0%BC%D0%B0%D1%84%D0%BE%D1%80_(%D0%BF%D1%80%D0%BE%D0%B3%D1%80%D0%B0%D0%BC%D0%BC%D0%B8%D1%80%D0%BE%D0%B2%D0%B0%D0%BD%D0%B8%D0%B5)]
-- (Starvation)[https://en.wikipedia.org/wiki/Starvation_%28computer_science%29]
-- (Bounded waiting)[https://en.wikipedia.org/wiki/Peterson%27s_algorithm#Bounded_waiting]
-- (Futex)[https://ru.wikipedia.org/wiki/%D0%A4%D1%8C%D1%8E%D1%82%D0%B5%D0%BA%D1%81]
 
 <h3>Channels</h3>
 
-Статьи:
-    - (Go Channels Internals)[https://habr.com/ru/company/oleg-bunin/blog/522742/] - Подробная статья о внутреннем устройстве каналов + видео доклада
-    - https://habr.com/ru/post/490336/ - анатомия каналов в Go
-
+**Статьи**:
+- [Go Channels Internals](https://habr.com/ru/company/oleg-bunin/blog/522742/) - Подробная статья о внутреннем устройстве каналов + видео доклада
+- [Анатомия каналов в Go](https://habr.com/ru/post/490336/) - анатомия каналов в Go
 
 
 <h3>Goroutines</h3>
 
-Статьи:
-- (sync.Map в Go 1.9)[https://habr.com/ru/post/338718/] - работа с мапами с использованием sync.Map
+In progress
