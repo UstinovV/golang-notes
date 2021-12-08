@@ -87,7 +87,6 @@ type example struct {
 - [Bounded waiting](https://en.wikipedia.org/wiki/Peterson%27s_algorithm#Bounded_waiting)
 - [Futex](https://ru.wikipedia.org/wiki/%D0%A4%D1%8C%D1%8E%D1%82%D0%B5%D0%BA%D1%81)
 
-
 <h3>Channels</h3>
 
 **Статьи**:
